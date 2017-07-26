@@ -131,8 +131,7 @@ get_port_spec(Config, OsType, {Arch, Target, Sources}) ->
     get_port_spec(Config, OsType, {Arch, Target, Sources, []});
 get_port_spec(Config, OsType, {_Arch, Target, Sources, Opts}) ->
     SourceFiles = lists:flatmap(fun(Source) ->
-                                        Source1 = filelib:wildcard(filename:join(rebar_state:dir(Config), Source)),
-                                        [rebar_utils:escape_chars(S) || S <- Source1]
+                                        filelib:wildcard(filename:join(rebar_state:dir(Config), Source))
                                 end, Sources),
     LinkLang =
         case lists:any(

@@ -61,10 +61,11 @@ compile_and_link(State, Specs) ->
                       LinkLang = pc_port_specs:link_lang(Spec),
                       LinkTemplate = select_link_template(LinkLang, Target),
                       Env = pc_port_specs:environment(Spec),
+                      QuotedTarget = pc_util:add_quotes(Target),
                       Cmd = expand_command(LinkTemplate, Env,
-                                           string:join(Bins, " "),
-                                           Target),
-                      rebar_api:info("Linking ~s", [Target]),
+                                           string:join([pc_util:add_quotes(B) || B <- Bins], " "),
+                                           QuotedTarget),
+                      rebar_api:info("Linking ~s", [QuotedTarget]),
                       rebar_utils:sh(Cmd, [{env, Env}, {cd, rebar_state:dir(State)}]);
                   false ->
                       ok
@@ -121,20 +122,22 @@ compile_each(_State, [], _Type, _Env, {NewBins, CDB}) ->
 compile_each(State, [Source | Rest], Type, Env, {NewBins, CDB}) ->
     Ext = filename:extension(Source),
     Bin = pc_util:replace_extension(Source, Ext, ".o"),
+    BinQuoted = pc_util:add_quotes(Bin),
+    SourceQuoted = pc_util:add_quotes(Source),
     Template = select_compile_template(Type, compiler(Ext)),
-    Cmd = expand_command(Template, Env, Source, Bin),
-    CDBEnt = cdb_entry(State, Source, Cmd, Rest),
+    Cmd = expand_command(Template, Env, SourceQuoted, BinQuoted),
+    CDBEnt = cdb_entry(State, SourceQuoted, Cmd, Rest),
     NewCDB = [CDBEnt | CDB],
-    case needs_compile(Source, Bin) of
+    case needs_compile(SourceQuoted, BinQuoted) of
         true ->
             ShOpts = [ {env, Env}
                      , return_on_error
                      , {use_stdout, false}
                      , {cd, rebar_state:dir(State)}
                      ],
-            exec_compiler(State, Source, Cmd, ShOpts),
+            exec_compiler(State, SourceQuoted, Cmd, ShOpts),
             compile_each(State, Rest, Type, Env,
-                         {[Bin | NewBins], NewCDB});
+                         {[BinQuoted | NewBins], NewCDB});
         false ->
             compile_each(State, Rest, Type, Env, {NewBins, NewCDB})
     end.

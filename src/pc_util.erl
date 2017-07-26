@@ -6,6 +6,7 @@
         , get_arch/0
         , wordsize/0
         , is_arch/1
+        , add_quotes/1
         ]).
 -export_type([]).
 
@@ -18,6 +19,10 @@ replace_extension(File, NewExt) ->
     replace_extension(File, OldExt, NewExt).
 replace_extension(File, OldExt, NewExt) ->
     filename:rootname(File, OldExt) ++ NewExt.
+
+add_quotes([$"|_] = String) -> String;
+add_quotes(String) ->
+    lists:flatten([$", rebar_utils:escape_double_quotes(String), $"]).
 
 target_type(Target)  -> target_type1(filename:extension(Target)).
 target_type1(".so")  -> drv;
