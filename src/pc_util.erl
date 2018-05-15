@@ -7,6 +7,9 @@
         , wordsize/0
         , is_arch/1
         , add_quotes/1
+        , strtok/2
+        , strjoin/2
+        , strchr/2
         ]).
 -export_type([]).
 
@@ -146,7 +149,7 @@ cross_sizeof(Arch, Type) ->
     ShOpts = [{use_stdout, false}, return_on_error],
     {error, {_,Res}} = rebar_utils:sh(Cmd, ShOpts),
     ok = file:delete(TempFile),
-    case string:tokens(Res, ":") of
+    case strtok(Res, ":") of
         [_, Ln | _] ->
             try list_to_integer(Ln) of
                 NumBytes -> integer_to_list(NumBytes*8)
@@ -157,6 +160,34 @@ cross_sizeof(Arch, Type) ->
         _ ->
             ""
     end.
+
+strtok(Str, SepList) ->
+    case erlang:function_exported(string, lexemes, 2) of
+        true -> string:lexemes(Str, SepList);
+        false -> apply(string, tokens, [Str, SepList])
+    end.
+
+%% Lifted lists:join/2 from OTP-19 to use with OTP-17 and OTP-18.
+%% TODO: remove when pc requires OTP >=19.
+lists_join(Sep, L) ->
+    case erlang:function_exported(lists, join, 2) of
+        true -> lists:join(Sep, L);
+        false -> lists_join1(Sep, L)
+    end.
+
+lists_join1(_Sep, []) -> [];
+lists_join1(Sep, [H|T]) -> [H|lists_join1_prepend(Sep, T)].
+
+lists_join1_prepend(_Sep, []) -> [];
+lists_join1_prepend(Sep, [H|T]) -> [Sep,H|lists_join1_prepend(Sep,T)].
+
+strjoin(L, Sep) ->
+    lists:flatten(lists_join(Sep, L)).
+
+strchr(S, C) when is_integer(C) -> strchr(S, C, 1).
+strchr([C|_Cs], C, I) -> I;
+strchr([_|Cs], C, I) -> strchr(Cs, C, I+1);
+strchr([], _C, _I) -> 0.
 
 mktempfile(Suffix) ->
     {A,B,C} = rebar_now(),

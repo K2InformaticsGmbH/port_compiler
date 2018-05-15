@@ -60,7 +60,7 @@ compile_and_link(State, Specs) ->
                   true ->
                       LinkLang = pc_port_specs:link_lang(Spec),
                       LinkTemplate = select_link_template(LinkLang, Target),
-                      Env = pc_port_specs:environment(Spec),
+                      Env = pc_port_specs:create_env(State, Spec),
                       QuotedTarget = pc_util:add_quotes(Target),
                       Cmd = expand_command(LinkTemplate, Env,
                                            string:join([pc_util:add_quotes(B) || B <- Bins], " "),
@@ -98,7 +98,7 @@ compile_sources(Config, Specs) ->
           fun(Spec, Acc) ->
                   Sources = pc_port_specs:sources(Spec),
                   Type    = pc_port_specs:type(Spec),
-                  Env     = pc_port_specs:environment(Spec),
+                  Env     = pc_port_specs:create_env(Config, Spec),
                   compile_each(Config, Sources, Type, Env, Acc)
           end, {[], []}, Specs),
     %% Rewrite clang compile commands database file only if something
@@ -146,12 +146,12 @@ compile_each(State, [Source | Rest], Type, Env, {NewBins, CDB}) ->
 cdb_entry(State, Src, Cmd, SrcRest) ->
     %% Omit all variables from cmd, and use that as cmd in
     %% CDB, because otherwise clang-* will complain about it.
-    CDBCmd = string:join(
+    CDBCmd = pc_util:strjoin(
                lists:filter(
                  fun("$"++_) -> false;
                     (_)      -> true
                  end,
-                 string:tokens(Cmd, " ")),
+                 pc_util:strtok(Cmd, " ")),
                " "),
 
     Cwd = rebar_state:dir(State),

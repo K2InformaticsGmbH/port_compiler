@@ -12,9 +12,7 @@ Use In Your Project
 
 Add the plugin to your `rebar.config`:
 
-    {plugins, [
-        { pc, {git, "git@github.com:blt/port_compiler.git", {branch, "master"}}}
-    ]}.
+    {plugins, [pc]}.
     {provider_hooks,
      [
       {pre,
@@ -26,6 +24,12 @@ Add the plugin to your `rebar.config`:
      ]
     }.
 
+
+If you want to use tools like clang-tidy, don't forget to enable the compile commands db like this:
+
+```
+{pc_clang_db, true}.
+```
 
 From your existing application:
 
@@ -80,6 +84,19 @@ BELOW HERE BE DRAGONS
 %%                {ArchRegex, TargetFile, Sources, Options}
 %%                {ArchRegex, TargetFile, Sources}
 %%                {TargetFile, Sources}
+%%
+%%                Note that if you want to use any of the rebar3 variables
+%%                below you must MUST use a ${}-style to get the expansion
+%%                to work. e.g. to expand REBAR_DEPS_DIR, do something like:
+%%
+%%                {port_specs, [{"priv/nif.so",
+%%                               ["c_src/nif.c",
+%%                                "${REBAR_DEPS_DIR}/foo/bar.c"]}]}.
+%%
+%%                This is a _very_ good way to be able to use your code both
+%%                as a top level app and a dependency.
+%%
+%%                CAVEAT! Not using {} is broken for the moment.
 %%
 %% * port_env - Erlang list of key/value pairs which will control
 %%              the environment when running the compiler and linker.

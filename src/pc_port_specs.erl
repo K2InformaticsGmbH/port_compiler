@@ -30,8 +30,10 @@
 
 -export([
          construct/1,
+         create_env/2,
          %% spec accessors
          environment/1,
+         opts/1,
          objects/1,
          sources/1,
          target/1,
@@ -66,9 +68,14 @@ construct(State) ->
             {ok, [S || S <- Specs, S#spec.sources /= []]}
     end.
 
+create_env(State, Spec) ->
+    pc_port_specs:environment(Spec) ++
+        try_and_create_env(State).
+
 %% == Spec Accessors ==
 
 environment(#spec{opts = Opts})        -> proplists:get_value(env, Opts).
+opts(#spec{opts = Opts})               -> Opts.
 objects(#spec{objects = Objects})      -> Objects.
 sources(#spec{sources = Sources})      -> Sources.
 target(#spec{target = Target})         -> Target.
@@ -78,6 +85,13 @@ link_lang(#spec{link_lang = LinkLang}) -> LinkLang.
 %%%===================================================================
 %%% Internal Functions
 %%%===================================================================
+
+try_and_create_env(State) ->
+    _ = code:ensure_loaded(rebar_env),
+    case erlang:function_exported(rebar_env, create_env, 1) of
+        false -> [];
+        true -> rebar_env:create_env(State)
+    end.
 
 port_spec_from_legacy(Config) ->
     %% Get the target from the so_name variable
@@ -107,7 +121,10 @@ port_spec_from_legacy(Config) ->
 
 port_sources(WorkDir, Sources) ->
     lists:flatmap(fun (Source) ->
-                      filelib:wildcard(Source, WorkDir)
+                          case filelib:wildcard(Source, WorkDir)of
+                              [] -> [Source];
+                              FileList -> FileList
+                          end
                   end, Sources).
 
 maybe_switch_extension({win32, nt}, Target) ->
@@ -130,9 +147,18 @@ get_port_spec(Config, OsType, {Target, Sources}) ->
 get_port_spec(Config, OsType, {Arch, Target, Sources}) ->
     get_port_spec(Config, OsType, {Arch, Target, Sources, []});
 get_port_spec(Config, OsType, {_Arch, Target, Sources, Opts}) ->
-    SourceFiles = lists:flatmap(fun(Source) ->
-                                        filelib:wildcard(filename:join(rebar_state:dir(Config), Source))
-                                end, Sources),
+    Env = try_and_create_env(Config),
+    SourceFiles =
+        lists:flatmap(
+          fun(Source) ->
+                  Source1 = expand_env(Source, Env),
+                  Source2 = rebar_utils:escape_chars(
+                              filename:join(rebar_state:dir(Config), Source1)),
+                  case filelib:wildcard(Source1) of
+                      [] -> [Source2];
+                      FileList -> FileList
+                  end
+          end, Sources),
     LinkLang =
         case lists:any(
                fun(Src) ->
@@ -151,6 +177,22 @@ get_port_spec(Config, OsType, {_Arch, Target, Sources, Opts}) ->
           sources   = SourceFiles,
           objects   = ObjectFiles,
           opts      = [port_opt(Config, O) || O <- fill_in_defaults(Opts)]}.
+
+expand_env(Source, Env) ->
+    case pc_util:strchr(Source, $$) of
+        0 ->
+            %% No variables to expand. Also hides undef on older rebar3.
+            Source;
+        _ ->
+            lists:foldl(
+              fun({Key, Value}, Acc) ->
+                      %% TODO: the expand_env_variable/3 only expands
+                      %% variables delimited by whitespace and inside
+                      %% ${}. Either fix or add a new function to
+                      %% rebar3 or make a new function here in pc.
+                      rebar_utils:expand_env_variable(Acc, Key, Value)
+              end, Source, Env)
+    end.
 
 coerce_extension({win32, nt}, Target) ->
     switch_to_dll_or_exe(Target);
