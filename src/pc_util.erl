@@ -25,7 +25,7 @@ replace_extension(File, OldExt, NewExt) ->
 
 add_quotes([$"|_] = String) -> String;
 add_quotes(String) ->
-    lists:flatten([$", rebar_utils:escape_double_quotes(String), $"]).
+    lists:flatten([$", re:replace(String, "\\\\ ", " ", [global, {return, list}, unicode]), $"]).
 
 target_type(Target)  -> target_type1(filename:extension(Target)).
 target_type1(".so")  -> drv;
