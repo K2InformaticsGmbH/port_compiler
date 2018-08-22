@@ -119,25 +119,25 @@ compile_sources(Config, Specs) ->
 
 compile_each(_State, [], _Type, _Env, {NewBins, CDB}) ->
     {lists:reverse(NewBins), lists:reverse(CDB)};
-compile_each(State, [Source | Rest], Type, Env, {NewBins, CDB}) ->
-    Ext = filename:extension(Source),
-    Bin = pc_util:replace_extension(Source, Ext, ".o"),
-    BinQuoted = pc_util:add_quotes(Bin),
-    SourceQuoted = pc_util:add_quotes(Source),
+compile_each(State, [SourceUnQuoted | Rest], Type, Env, {NewBins, CDB}) ->
+    Ext = filename:extension(SourceUnQuoted),
+    BinUnQuoted = pc_util:replace_extension(SourceUnQuoted, Ext, ".o"),
+    Bin = pc_util:add_quotes(BinUnQuoted),
+    Source = pc_util:add_quotes(SourceUnQuoted),
     Template = select_compile_template(Type, compiler(Ext)),
-    Cmd = expand_command(Template, Env, SourceQuoted, BinQuoted),
-    CDBEnt = cdb_entry(State, SourceQuoted, Cmd, Rest),
+    Cmd = expand_command(Template, Env, Source, Bin),
+    CDBEnt = cdb_entry(State, Source, Cmd, Rest),
     NewCDB = [CDBEnt | CDB],
-    case needs_compile(SourceQuoted, BinQuoted) of
+    case needs_compile(Source, Bin) of
         true ->
             ShOpts = [ {env, Env}
                      , return_on_error
                      , {use_stdout, false}
                      , {cd, rebar_state:dir(State)}
                      ],
-            exec_compiler(State, SourceQuoted, Cmd, ShOpts),
+            exec_compiler(State, Source, Cmd, ShOpts),
             compile_each(State, Rest, Type, Env,
-                         {[BinQuoted | NewBins], NewCDB});
+                         {[Bin | NewBins], NewCDB});
         false ->
             compile_each(State, Rest, Type, Env, {NewBins, NewCDB})
     end.
