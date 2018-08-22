@@ -119,12 +119,23 @@ port_spec_from_legacy(Config) ->
             objects = port_objects(Sources),
             opts    = [port_opt(Config, O) || O <- fill_in_defaults([])]}.
 
+maybe_report_wc(Source, Found) ->
+    case Found of
+        [] ->
+            rebar_api:warn("Found no source files for:~n~p", [Source]);
+        _ ->
+            ok
+    end,
+    Found.
+
+wildcard(Source) ->
+    maybe_report_wc(Source, filelib:wildcard(Source)).
+wildcard(Source, WorkDir) ->
+    maybe_report_wc(Source, filelib:wildcard(Source, WorkDir)).
+
 port_sources(WorkDir, Sources) ->
     lists:flatmap(fun (Source) ->
-                          case filelib:wildcard(Source, WorkDir)of
-                              [] -> [Source];
-                              FileList -> FileList
-                          end
+                      wildcard(Source, WorkDir)
                   end, Sources).
 
 maybe_switch_extension({win32, nt}, Target) ->
@@ -151,13 +162,7 @@ get_port_spec(Config, OsType, {_Arch, Target, Sources, Opts}) ->
     SourceFiles =
         lists:flatmap(
           fun(Source) ->
-                  Source1 = expand_env(Source, Env),
-                  Source2 = rebar_utils:escape_chars(
-                              filename:join(rebar_state:dir(Config), Source1)),
-                  case filelib:wildcard(Source1) of
-                      [] -> [Source2];
-                      FileList -> FileList
-                  end
+                  wildcard(expand_env(Source, Env))
           end, Sources),
     LinkLang =
         case lists:any(
